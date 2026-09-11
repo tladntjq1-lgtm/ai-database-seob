@@ -57,7 +57,7 @@ PostgreSQL 버전:PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.3522
 3. SQL이 실행되었다는 사실만으로 데이터 내용도 올바르다고 할 수 있나요?
 
 ```text
-나의 답:
+나의 답:아니오
 ```
 
 ## 1-4. 증거 화면
