@@ -718,7 +718,7 @@ https://github.com/<본인-GitHub-ID>/<본인-저장소>/blob/main/assignments/c
 내 제출 URL:
 
 ```text
-
+https://github.com/tladntjq1-lgtm/ai-database-seob/blob/main/assignments/chapter07/chapter07_answer.md
 ```
 
 > 저장소 메인 URL, 교수자 템플릿 URL, Raw URL이 아니라 **작성 완료된 본인 `chapter07_answer.md` 파일 화면 URL**을 제출합니다.
