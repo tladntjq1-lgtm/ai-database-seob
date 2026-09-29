@@ -32,9 +32,9 @@ code/chapter08/00_check_course_project.sql
 검증 메시지:Chapter 08 prerequisite check passed
 
 students 행 수:3
-instructors 행 수:2
-courses 행 수:3
-enrollments 행 수:5
+instructors 행 수:
+courses 행 수:
+enrollments 행 수:
 
 전체 신청 건수:
 전체 recorded_amount:
@@ -60,7 +60,11 @@ enrollments = 5
 ### 기준값이 다르면 그대로 진행하면 안 되는 이유
 
 ```text
+실제로 처음 00번 검사를 실행했을 때 학생 수가 3명이 아니라 4명으로 나와서 예외가 발생했다. 원인을 찾아보니 어디선가 테스트로 넣었던 104번 학생(문강)이 남아 있었던 것이었고, 이 학생은 enrollments에 연결된 신청도 없는 상태였다.
 
+이걸 그냥 무시하고 "내 데이터에서는 학생이 4명이니까 4명 기준으로 결과를 해석하자"라고 넘어갔다면, 이후 JOIN·집계 실습에서 나오는 모든 예상 행 수와 검산 기준(강의 301=2건, 강의 303=0건, 전체 5건/590000 등)이 교재 기준과 안 맞게 되고, 뒤에서 SQL이 틀렸는지 데이터가 틀렸는지 구분할 수 없게 됐을 것이다.
+
+그래서 실제 결과에 기대값을 맞추는 대신, 여분의 104번 학생 행을 지우고 시퀀스를 RESTART WITH 104로 되돌려서 Chapter 07 기준 상태(3/2/3/5, 590000)를 먼저 복구한 뒤에 Chapter 08을 시작했다.
 ```
 
 ### 증거 화면
@@ -82,40 +86,40 @@ assignments/chapter08/images/step01_prerequisite.png
 ## 질문 A
 
 ```text
-업무 질문:
-결과 한 행의 의미:
-포함 상태:
-제외 상태:
-JOIN할 테이블:
-JOIN 경로:
-INNER JOIN / LEFT JOIN 선택:
-그 이유:
-예상 행 수:
+업무 질문: 각 수강신청 건마다 학생 이름, 강의 제목, 담당 강사 이름을 한 번에 보여주세요.
+결과 한 행의 의미: 수강신청 한 건
+포함 상태: 전체 상태(신청/수강중/완료/취소 모두 포함) — 상태로 거르는 질문이 아니라 신청 기록 자체를 보여주는 목적
+제외 상태: 없음
+JOIN할 테이블: enrollments, students, courses, instructors
+JOIN 경로: enrollments.student_id → students.id / enrollments.course_id → courses.id / courses.instructor_id → instructors.id
+INNER JOIN / LEFT JOIN 선택: INNER JOIN
+그 이유: 신청 행은 반드시 학생·강의와 연결되어 있고(FK NOT NULL), 강의도 반드시 강사가 있으므로 INNER JOIN으로 연결해도 신청 행이 하나도 빠지지 않는다.
+예상 행 수: 5행 (enrollments 전체 건수와 동일)
 ```
 
 ## 질문 B
 
 ```text
-업무 질문:
-결과 한 행의 의미:
-포함 상태:
-제외 상태:
-JOIN할 테이블:
-JOIN 경로:
-집계 대상:
-예상 결과:
+업무 질문: 전체/활성/취소 제외 신청 건수와 기록 금액 합계는 각각 얼마인가요?
+결과 한 행의 의미: 상태 범위 하나(전체 / 활성 / 취소 제외) 당 한 행 요약
+포함 상태: 범위별로 다름 — 활성=신청·수강중, 취소 제외=취소를 뺀 나머지
+제외 상태: 활성 기준은 완료·취소 제외 / 취소 제외 기준은 취소만 제외
+JOIN할 테이블: 없음 (enrollments 단일 테이블에서 COUNT/SUM FILTER로 계산)
+JOIN 경로: 해당 없음
+집계 대상: COUNT(*), SUM(recorded_amount) — 상태 조건별 FILTER
+예상 결과: 전체 5건/590000, 활성 3건/340000, 취소 제외 4건/440000
 ```
 
 ## 질문 C
 
 ```text
-업무 질문:
-결과 한 행의 의미:
-포함 상태:
-제외 상태:
-0건인 부모도 보여야 하는가:
-NULL을 어떻게 해석할 것인가:
-예상 결과:
+업무 질문: 강의별로 취소되지 않은 신청 건수와 기록 금액은 얼마인가요? (취소 제외 신청이 0건인 강의도 표시)
+결과 한 행의 의미: 강의 한 개 (신청 여부와 무관하게 존재하는 모든 강의)
+포함 상태: 취소 제외 신청(신청/수강중/완료)은 연결하되, 강의 자체는 조건 없이 전부 포함
+제외 상태: 취소된 신청 (자식 쪽만 제외, 부모인 강의는 제외 대상 아님)
+0건인 부모도 보여야 하는가: 그렇다 — 강의 303처럼 취소 제외 신청이 없어도 강의 행 자체는 남아야 한다.
+NULL을 어떻게 해석할 것인가: LEFT JOIN 결과에서 enrollments 쪽 컬럼이 NULL이면 "그 강의에 취소 제외 신청이 실제로 없다"는 뜻이며 데이터 누락이 아니다. COUNT(*)로 세면 부모 행 때문에 1이 나올 수 있으니, 실제 신청 수는 COUNT(e.id)로 세야 한다.
+예상 결과: 강의 301=2건/200000, 강의 302=2건/240000, 강의 303=0건/0원(행 자체는 1개 남음)
 ```
 
 ---
@@ -127,45 +131,69 @@ NULL을 어떻게 해석할 것인가:
 실행 전 예상:
 
 ```text
-결과 한 행 =
-예상 행 수 =
-JOIN 경로 =
+결과 한 행 = 수강신청 한 건
+예상 행 수 = 5행
+JOIN 경로 = enrollments.student_id → students.id / enrollments.course_id → courses.id
 ```
 
 내가 실행한 SQL:
 
 ```sql
-
+SELECT
+    e.id AS enrollment_id,
+    s.name AS student_name,
+    c.title AS course_title,
+    e.status
+FROM course_project.enrollments AS e
+INNER JOIN course_project.students AS s
+    ON e.student_id = s.id
+INNER JOIN course_project.courses AS c
+    ON e.course_id = c.id
+ORDER BY e.id;
 ```
 
 실제 결과:
 
 ```text
-실제 행 수:
-예상과 일치 여부:
+실제 행 수: 5행
+예상과 일치 여부: 일치 (1001 김민지, 1002 김민지, 1003 이준호, 1004 박서연, 1005 이준호)
 ```
 
 ### 학생 이름이 여러 번 보이는 것이 중복 오류가 아닐 수 있는 이유
 
 ```text
-
+결과의 기준(한 행)은 "학생"이 아니라 "수강신청 한 건"이다. 학생 한 명이 여러 강의에 신청할 수 있는 1:N 관계이므로, 김민지(101)가 두 강의(301, 302)에 신청했다면 신청 기준 결과에서는 김민지 이름이 두 번 나오는 게 정상이다. 이준호(102)도 두 강의(301, 302)에 신청해서 두 번 나온다.
+만약 여기서 이름 중복이 이상해 보인다고 SELECT DISTINCT student_name을 넣으면, 오히려 "학생이 어떤 강의들에 신청했는지"를 알 수 없게 결과가 왜곡된다. 중복 제거는 결과 한 행의 기준을 먼저 정한 뒤에, 그 기준과 실제로 안 맞을 때만 검토해야 한다.
 ```
 
 ## 3-2. 학생·강의·강사까지 연결
 
 ```text
-결과 한 행 =
-강사까지 가는 JOIN 경로 =
+결과 한 행 = 수강신청 한 건
+강사까지 가는 JOIN 경로 = enrollments.course_id → courses.id → courses.instructor_id → instructors.id (enrollments와 instructors는 직접 연결되지 않으므로 courses를 거쳐야 함)
 ```
 
 ```sql
-
+SELECT
+    e.id AS enrollment_id,
+    s.name AS student_name,
+    c.title AS course_title,
+    i.name AS instructor_name,
+    e.status
+FROM course_project.enrollments AS e
+INNER JOIN course_project.students AS s
+    ON e.student_id = s.id
+INNER JOIN course_project.courses AS c
+    ON e.course_id = c.id
+INNER JOIN course_project.instructors AS i
+    ON c.instructor_id = i.id
+ORDER BY e.id;
 ```
 
 실제 행 수:
 
 ```text
-
+5행 (예상과 일치). 문길래 강사가 담당한 강의(데이터베이스 입문, 정규화 실습)에 신청 4건, 홍길동 강사가 담당한 강의(파이썬 데이터 분석)에 신청 1건으로 나뉘어 나온다.
 ```
 
 ### 증거 화면
